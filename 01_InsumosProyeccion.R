@@ -1,5 +1,5 @@
 
-
+##########################################################
 #### Librerias
 library(tidyverse)
 library(here)
@@ -61,7 +61,6 @@ save(linea_calles,file = 'Resultados/linea_calles.RData')
 ssz = st_read(here('SHP','Marco2011_ZONA_Montevideo_VivHogPer'))
 ############################################
 ###### Shape d paradas (refugios)
-
 refugio = paradas %>% group_by(COD_UBIC_P) %>% 
   slice_head() %>% 
   dplyr::select(COD_UBIC_P,COD_CALLE1,COD_CALLE2)
@@ -69,14 +68,8 @@ refugio = paradas %>% group_by(COD_UBIC_P) %>%
 
 ### Hago el join espacial para pegarle la info a las paradas
 ref = refugio %>% st_join(ssz[,c('CODSEC','CODSEG','CODCOMP','BARRIO','NROBARRIO','CCZ','MUNICIPIO')])
-
-save(ref,file = 'Resultados/refugio_sf.RData')
-#########################################
-#########################################
-##### Cargo funciones 
-fun = dir(here('Funciones'))
-fun = fun[grep('\\.R',fun,ignore.case = T)]
-for(ii in fun) source(here('Funciones',ii))
+### Guardo los refugios con la info de las zonas
+save(ref,file = 'Resultados/ref.RData')
 
 #########################################
 #########################################
@@ -92,7 +85,6 @@ for(ii in callesUsar) {
   cont = cont + 1
   if((cont %% 50) == 0) print(cont)
   
-  # print(ii)
   auxCalle = vias %>% filter(COD_NOMBRE == ii)
   res = simplificaCalleV2(auxCalle,cellsizeMax = 500,npart = 10,distSegm = 75,
                         varsKeep = c('NOM_CALLE','COD_NOMBRE'))
@@ -103,6 +95,8 @@ for(ii in callesUsar) {
 
 names(resList) = as.character(callesUsar)
 names(puntList) = as.character(callesUsar)
+
+########################################
 ########################################
 ###### Representa las lineas variantes como puntos con las paradas identidficadas
 
@@ -111,6 +105,7 @@ lineasUsar = lineas %>% filter(!st_is_empty(st_geometry(.)) & COD_VARIAN %in% pa
 
 listLineas = list()
 
+# "7933" linea con problemas
 cont = 0
 for(ii in lineasUsar$COD_VARIAN) {
   
@@ -119,10 +114,11 @@ for(ii in lineasUsar$COD_VARIAN) {
   
   auxCalle = lineas %>% filter(COD_VARIAN == ii)
   
-  res = simplifiVariante(auxCalle,distSegm = 25,
+  res = simplifiVarianteV2(auxCalle,distSegm = 25,
                          varsKeep = c("COD_LINEA","DESC_LINEA","COD_VARIAN","DESC_VARIA"),
                          datAux = paradas, varFind = 'COD_VARIAN')
   
+
   listLineas[[length(listLineas) + 1]] = res  
   
 }
@@ -140,6 +136,7 @@ for(ii in names(listLineas)) {
   
   listLineaProy[[length(listLineaProy) + 1]] = getCallesLimV2(linaVar = listLineas[[ii]],
                      puntList)
+  
 }
 
 names(listLineaProy) = names(listLineas)
@@ -153,68 +150,4 @@ save(resList,puntList,file = 'Resultados/Calles_Simplif.RData')
 save(listLineas,file = 'Resultados/Lineas_Simplif.RData')
 # Asignacion de puntos de la linea a los puntos de las calles
 save(listLineaProy,file = 'Resultados/Proy_Lineas_to_Calles.RData')
-
-
-##############################
-##### Encuentra la secuencia de puntos
-
-parIni = 4041
-parFin = 5704
-
-codLinVar = '1'
-
-getSecuencia = function(codLinVar,parIni,parFin,listLineaProy,puntList) {
-
-  resPointCalle = listLineaProy[[as.character(codLinVar)]]
-
-  inputGet = resPointCalle[which(resPointCalle$codParada == parIni):which(resPointCalle$codParada == parFin),]
-
-
-  res0 = do.call(rbind,sapply(1:nrow(inputGet),function(xx) {
-    fila = inputGet[xx,]
-    codCalle = as.character(fila$COD_NOMBRE)
-    seqPos = fila$posIni : fila$posFin
-
-    auxCalles = puntList[[codCalle]] %>% filter(ID_calle %in% seqPos)
-
-    list(auxCalles)
-  })
-  )
-
-  return(res0)
-}
-
-
-
-#####################################
-#############
-# plot(st_geometry(listLineas[[codLinVar]]),cex = 0.5)
-# plot(st_geometry(res0),add = T,cex = 0.3,col = 'red')
-
-
-
-codLinVar
-
-lineas_lf = st_transform(x = listLineas[[as.character(codLinVar)]], crs = 4326)
-viasUsar_lf = st_transform(x = res0, crs = 4326)
-
-
-#####
-
-pp = leaflet() %>% # ABRE LA VENTANA PARA HACER EL MAPA
-  addTiles(group = "OSM") %>% # DEFINE UN FONDO (POR DEFECTO OSM)
-  addProviderTiles(providers$CartoDB.Positron, group = 'CartoDB.Positron') %>%
-  addCircles(data = lineas_lf,weight = 2,color = 'red',
-               group = 'rutas') %>%
-  addCircles(data = viasUsar_lf,weight = 2,color = 'blue',
-               group = 'lineas') %>%
-  # addPolylines(data = viasUsar_lf,weight = 2,color = 'green',
-  #              group = 'calles') %>%
-  addLayersControl(
-    baseGroups = c("CartoDB.Positron","OSM"),
-    overlayGroups = c('rutas','lineas','calles'),
-    options = layersControlOptions(collapsed = F)) 
-
-
-
 

@@ -9,6 +9,9 @@ library(lubridate)
 library(parallel)
 library(viridis)
 
+library(fst)
+library(mefa)
+
 #########################################
 #########################################
 ##### Cargo funciones 
@@ -34,7 +37,9 @@ lineasUsar = names(listLineaProy)
 
 ###################################
 ##### Carga refugios
-load('Resultados/refugio_sf.RData')
+# load('Resultados/refugio_sf.RData')
+
+load('Resultados/ref.RData')
 
 #### Cargo descripcion de las lineas
 load('Resultados/lineaCod.RData')
@@ -204,20 +209,56 @@ save(listSegPoint,file = 'Resultados/listSegPointV2.RData')
 
 resPoint = as.data.frame(data.table::rbindlist(listSegPoint)) 
 
-## Variable de agrupacion
-# varsGroup = varsJoin
 
-##### Agrego para calcular el flujo desagregado por las variables de grupo
-# resPoint = puntosAll %>% group_by_at(vars(dplyr::one_of(varsGroup))) %>%
-#   summarise(X = mean(X),
-#             Y = mean(Y),
-#             SumTot = sum(Tot)) %>% ungroup()
+resPoint = resPoint %>% 
+  mutate(dirAv = ifelse(direction == 'SUR_NORTE','S_N',
+                        ifelse(direction == 'NORTE_SUR','N_S',
+                               ifelse(direction == 'ESTE_OESTE','E_O',
+                                      ifelse(direction == 'OESTE_ESTE','O_E','')))),
+         direction = factor(direction,levels = c('SUR_NORTE','NORTE_SUR','ESTE_OESTE','OESTE_ESTE')),
+         ID_Unico = paste(ID,ID_Viaje,sep = '_'),
+         ID_punto = paste(COD_NOMBRE,ID_calle,dirAv,sep = '_'))
 
 
+################################################
+###### Genero base con puntos unicos
+
+puntRefUnicos = resPoint %>% 
+  dplyr::select(ID_calle,NOM_CALLE,COD_NOMBRE,direction,X,Y,direction,dirAv,ID_punto) %>% 
+  group_by(ID_calle,NOM_CALLE,COD_NOMBRE,direction) %>%
+  slice_head() %>% ungroup()
+
+
+##############################################
+#### Saco variables de la base resPoint para que quede más manejable
+
+resPoint = resPoint %>% dplyr::select(ID,ID_Unico,ID_punto,dirAv,minutos_sub,minutos_baj,Tot,
+                                      DESC_LINEA,DESC_VARIA,COD_VARIAN,par_Sub,
+                                      par_Baj,pesoInt,minPas)
+
+
+
+#################################################
+######## Codigos de calles
+codCallesUnic = puntRefUnicos %>% dplyr::select(COD_NOMBRE,NOM_CALLE) %>% group_by(COD_NOMBRE,NOM_CALLE) %>%
+  slice_head()
+
+
+#################################################
+#### Guardo los puntos de referencia unicos
+
+save(codCallesUnic,file = 'Resultados/codCallesUnic.RData')
+
+#################################################
+#### Guardo los puntos de referencia unicos
+
+save(puntRefUnicos,file = 'Resultados/puntRefUnicos.RData')
 
 ###########################################
 ###########################################
 # save(resPoint,file = 'Resultados/resPoint_long.RData')
 save(resPoint,file = 'Resultados/resPoint_long_ID_Dir02.RData')
+
+write.fst(resPoint,'Resultados/resPoint_long_ID_Dir02.fst')
 ###########################################
 ###########################################
