@@ -123,7 +123,6 @@ simplificaCalleV2 = function(auxCalle,cellsizeMax = 500,npart = 10,distSegm = 15
   
   revert = F
   
-
   if((Var['X'] < Var['Y'])) {
     dirIni = 'NORTE'
     dirFin = 'SUR'

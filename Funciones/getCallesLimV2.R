@@ -3,14 +3,29 @@ getCallesLimV2 = function(linaVar,
   
   ### Me capturo los codigos de calles de interes
   
+  # useCalle = linaVar %>% mutate(calleAnt = lead(COD_CALLE1),
+  #                              callePos = lag(COD_CALLE1),
+  #                              IndAnt = ifelse(calleAnt != COD_CALLE1,1,0),
+  #                              IndPos = ifelse(callePos != COD_CALLE1,1,0),
+  #                              Ind = ifelse(is.na(IndPos),IndAnt,IndPos),
+  #                              NumCalle = cumsum(Ind)) %>% st_set_geometry(NULL) %>%
+  #   group_by(NumCalle,COD_CALLE1) %>% slice_head() %>% select(NumCalle,COD_CALLE1) %>%
+  #   data.frame() %>% filter(as.character(COD_CALLE1) %in% names(puntList))
+  # 
+  
   useCalle = linaVar %>% mutate(calleAnt = lead(COD_CALLE1),
-                               callePos = lag(COD_CALLE1),
-                               IndAnt = ifelse(calleAnt != COD_CALLE1,1,0),
-                               IndPos = ifelse(callePos != COD_CALLE1,1,0),
-                               Ind = ifelse(is.na(IndPos),IndAnt,IndPos),
-                               NumCalle = cumsum(Ind)) %>% st_set_geometry(NULL) %>%
-    group_by(NumCalle,COD_CALLE1) %>% slice_head() %>% select(NumCalle,COD_CALLE1) %>%
-    data.frame() %>% filter(as.character(COD_CALLE1) %in% names(puntList))
+                                callePos = lag(COD_CALLE1),
+                                IndAnt = ifelse(calleAnt != COD_CALLE1,1,0),
+                                IndPos = ifelse(callePos != COD_CALLE1,1,0),
+                                Ind = ifelse(is.na(IndPos),IndAnt,IndPos),
+                                NumCalle = cumsum(Ind)) %>% st_set_geometry(NULL) %>%
+    group_by(NumCalle,COD_CALLE1) %>% 
+    summarise(ID_LinMin = min(ID_Lin),
+              ID_LinMax = max(ID_Lin)) %>% 
+    ungroup() %>%
+    data.frame() %>% 
+    filter(as.character(COD_CALLE1) %in% names(puntList)) %>% 
+    suppressMessages()
   
   
   # useCalle = as.character(unique(linaVar$codParCalle))
@@ -25,12 +40,16 @@ getCallesLimV2 = function(linaVar,
     sapply(1:nrow(useCalle),function(xx) {
     codCalle = as.character(useCalle[xx,'COD_CALLE1'])
     NumCalle = useCalle[xx,'NumCalle']
+    ID_LinMin = useCalle[xx,'ID_LinMin']
+    ID_LinMax = useCalle[xx,'ID_LinMax']
+    
     aux = puntList[[codCalle]]
     
     linAux = subset(linaVar,COD_CALLE1 == codCalle)
     
     matchAux <- linAux %>% 
       st_join(aux, join=nngeo::st_nn, maxdist= Inf,k=1) %>% 
+      filter(ID_Lin >= ID_LinMin & ID_Lin <= ID_LinMax) %>%
       suppressMessages()
     
     matchAux$NumCalle = NumCalle
